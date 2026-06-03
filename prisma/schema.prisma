@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum BetType {
+  SINGLE
+  MULTIPLE
+}
+
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+  VOID
+  CASHOUT
+}
+
+enum LegStatus {
+  PENDING
+  WON
+  LOST
+  VOID
+}
+
+enum OddsFormat {
+  DECIMAL
+  FRACTIONAL
+  AMERICAN
+}
+
+model UserSettings {
+  id              String     @id @default(cuid())
+  currency        String     @default("EUR")
+  oddsFormat      OddsFormat @default(DECIMAL)
+  initialBankroll Float      @default(0)
+  voidPolicy      String     @default("REDUCE_TO_ONE") // void leg → odds 1.0 in multiples
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Bet {
+  id              String     @id @default(cuid())
+  type            BetType
+  status          BetStatus  @default(PENDING)
+  placedAt        DateTime   @default(now())
+  settledAt       DateTime?
+  sport           String?
+  competition     String?
+  market          String?
+  notes           String?
+  stake           Float
+  combinedOdds    Float // cached decimal odds
+  potentialReturn Float // stake * combinedOdds
+  actualReturn    Float?
+  profitLoss      Float?
+  legs            BetLeg[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([placedAt])
+  @@index([status])
+  @@index([type])
+}
+
+model BetLeg {
+  id         String    @id @default(cuid())
+  betId      String
+  bet        Bet       @relation(fields: [betId], references: [id], onDelete: Cascade)
+  orderIndex Int
+  eventLabel String
+  selection  String
+  homeTeam   String?
+  awayTeam   String?
+  oddsDecimal Float
+  status     LegStatus @default(PENDING)
+
+  @@index([betId])
+  @@index([homeTeam])
+  @@index([awayTeam])
+}
